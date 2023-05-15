@@ -357,7 +357,7 @@ class Decoder(nn.Module):
                 tokens, incremental_state=incremental_state
             )
 
-        if incremental_state is not None:
+        if incremental_state is not None and not self.is_first_step(incremental_state):
             tokens = tokens[:, -1:]
             if positions is not None:
                 positions = positions[:, -1:]
@@ -377,6 +377,9 @@ class Decoder(nn.Module):
 
         return x, embed
 
+    def is_first_step(self, incremental_state):
+        return incremental_state.get("is_first_step", False)
+
     def forward(
         self,
         prev_output_tokens,
@@ -392,6 +395,7 @@ class Decoder(nn.Module):
         x, _ = self.forward_embedding(
             prev_output_tokens, token_embeddings, incremental_state
         )
+        is_first_step = self.is_first_step(incremental_state)
 
         # relative position
         self_attn_rel_pos_bias = None
@@ -400,7 +404,7 @@ class Decoder(nn.Module):
             self_attn_rel_pos_bias = self.self_attn_relative_position(
                 batch_size=x.size(0), qlen=slen, klen=slen
             )
-            if incremental_state is not None:
+            if incremental_state is not None and not is_first_step:
                 self_attn_rel_pos_bias = self_attn_rel_pos_bias[-1:, :, :]
         cross_attn_rel_pos_bias = None
         if self.cross_attn_relative_position is not None:
@@ -409,7 +413,7 @@ class Decoder(nn.Module):
                 qlen=slen,
                 klen=encoder_out["encoder_out"].size(1),
             )
-            if incremental_state is not None:
+            if incremental_state is not None and not is_first_step:
                 cross_attn_rel_pos_bias = cross_attn_rel_pos_bias[-1:, :, :]
 
         # decoder layers
@@ -421,7 +425,7 @@ class Decoder(nn.Module):
             l_aux = encoder_out["l_aux"] if "l_aux" in encoder_out else []
 
         for idx, layer in enumerate(self.layers):
-            if incremental_state is None:
+            if incremental_state is None or is_first_step:
                 self_attn_mask = torch.triu(
                     torch.zeros([x.size(1), x.size(1)])
                     .float()
@@ -429,6 +433,9 @@ class Decoder(nn.Module):
                     .type_as(x),
                     1,
                 )
+                if is_first_step and incremental_state is not None:
+                    if idx not in incremental_state:
+                        incremental_state[idx] = {}
             else:
                 self_attn_mask = None
                 if idx not in incremental_state:
