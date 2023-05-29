@@ -378,6 +378,8 @@ class Decoder(nn.Module):
         return x, embed
 
     def is_first_step(self, incremental_state):
+        if incremental_state is None:
+            return False
         return incremental_state.get("is_first_step", False)
 
     def forward(
