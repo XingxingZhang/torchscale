@@ -140,6 +140,7 @@ class DecoderLayer(nn.Module):
         self_attn_padding_mask=None,
         self_attn_rel_pos=None,
         cross_attn_rel_pos=None,
+        is_first_step=False,
     ):
         residual = x
         if self.normalize_before:
@@ -153,6 +154,7 @@ class DecoderLayer(nn.Module):
             incremental_state=incremental_state,
             attn_mask=self_attn_mask,
             rel_pos=self_attn_rel_pos,
+            is_first_step=is_first_step,
         )
         x = self.dropout_module(x)
 
@@ -454,6 +456,7 @@ class Decoder(nn.Module):
                 self_attn_padding_mask=self_attn_padding_mask,
                 self_attn_rel_pos=self_attn_rel_pos_bias,
                 cross_attn_rel_pos=cross_attn_rel_pos_bias,
+                is_first_step=is_first_step,
             )
             l_aux.append(l_aux_i)
             inner_states.append(x)
